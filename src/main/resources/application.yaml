@@ -1,8 +1,10 @@
 spring:
   application:
-    name: stream
+    name: kafka_stream
   kafka:
     bootstrap-servers: localhost:9092
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     streams:
       application-id: fraud-detection-app
       properties:

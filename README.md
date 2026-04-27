@@ -7,7 +7,7 @@ If a user exceeds 5 events in a window, an alert is emitted to the `alerts` topi
 
 | Topic | Direction | Description |
 |---|---|---|
-| `user-events` | Input | Raw user activity events (JSON) |
+| `user-events` | Input | User activity events (Jackson-serialized JSON) |
 | `alerts` | Output | Fraud alerts when threshold exceeded |
 
 ## How to Run Kafka (Docker)
@@ -51,9 +51,34 @@ Or build and run the jar:
 java -jar build/libs/stream-0.0.1-SNAPSHOT.jar
 ```
 
-## Produce Sample Events
+## Testing via REST API
 
-Send events for `user-1` — 6 events within a few seconds will trigger an alert:
+The app exposes two endpoints on `http://localhost:8080`.
+
+### Send a single event (normal activity)
+
+```bash
+curl -X POST http://localhost:8080/events \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-1","amount":120}'
+```
+
+Repeat this fewer than 5 times within a 5-minute window — no alert should appear.
+
+### Simulate fraud (instantly triggers an alert)
+
+```bash
+curl -X POST http://localhost:8080/events/simulate-fraud/user-1
+```
+
+This sends 6 events back-to-back for `user-1`. The threshold (5) is exceeded immediately and an alert is emitted to the `alerts` topic.
+
+---
+
+## Produce Sample Events (via Kafka console — alternative)
+
+The app uses Jackson to deserialize events, so plain JSON from the console producer still works.
+Prefer the REST API above for normal testing.
 
 ```bash
 docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
@@ -68,8 +93,6 @@ docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
 {"userId":"user-2","amount":75,"timestamp":1710000010000}
 {"userId":"user-2","amount":90,"timestamp":1710000040000}
 ```
-
-> Note: the `timestamp` field in the JSON is informational. The actual event-time used by Kafka Streams is the Kafka record timestamp set by the producer. For the demo, the wall-clock time of production is used, so produce all events within the same 5-minute window.
 
 ## Observe Results
 

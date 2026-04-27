@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kafka.stream.model.AlertEvent;
 import com.kafka.stream.model.UserEvent;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -18,7 +19,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
-import org.springframework.kafka.support.serializer.JsonSerde;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -43,21 +43,17 @@ public class FraudDetectionTopology {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Bean
-    public KStream<String, String> fraudDetectionStream(StreamsBuilder builder) {
+    public KStream<String, UserEvent> fraudDetectionStream(StreamsBuilder builder) {
         return buildTopology(builder, inputTopic, outputTopic, eventThreshold, windowMinutes);
     }
 
-    static KStream<String, String> buildTopology(StreamsBuilder builder, String inputTopic,
+    static KStream<String, UserEvent> buildTopology(StreamsBuilder builder, String inputTopic,
             String outputTopic, long threshold, long windowMinutes) {
 
-        JsonSerde<UserEvent> userEventSerde = new JsonSerde<>(UserEvent.class);
+        Serde<UserEvent> userEventSerde = jsonSerde(UserEvent.class);
 
-        KStream<String, String> rawStream = builder.stream(inputTopic,
-                Consumed.with(Serdes.String(), Serdes.String()));
-
-        KStream<String, UserEvent> userEventStream = rawStream
-                .mapValues(FraudDetectionTopology::parseEvent)
-                .filter((k, v) -> v != null)
+        KStream<String, UserEvent> userEventStream = builder
+                .stream(inputTopic, Consumed.with(Serdes.String(), userEventSerde))
                 .selectKey((k, v) -> v.getUserId())
                 .filter((k, v) -> k != null);
 
@@ -73,16 +69,28 @@ public class FraudDetectionTopology {
                 .filter((k, v) -> v != null)
                 .to(outputTopic, Produced.with(Serdes.String(), Serdes.String()));
 
-        return rawStream;
+        return userEventStream;
     }
 
-    private static UserEvent parseEvent(String json) {
-        try {
-            return MAPPER.readValue(json, UserEvent.class);
-        } catch (Exception e) {
-            log.warn("Skipping unparseable event: {}", json);
-            return null;
-        }
+    // TODO: Spring Kafka 4.0 deprecated JsonSerde/JsonSerializer/JsonDeserializer with no built-in replacement yet.
+    // Using plain Jackson + Serdes.serdeFrom() until Spring Kafka provides a clean alternative.
+    private static <T> Serde<T> jsonSerde(Class<T> type) {
+        return Serdes.serdeFrom(
+                (_, data) -> {
+                    try {
+                        return MAPPER.writeValueAsBytes(data);
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to serialize " + type.getSimpleName(), e);
+                    }
+                },
+                (_, data) -> {
+                    try {
+                        return data == null ? null : MAPPER.readValue(data, type);
+                    } catch (Exception e) {
+                        throw new RuntimeException("Failed to deserialize " + type.getSimpleName(), e);
+                    }
+                }
+        );
     }
 
     private static String toAlertJson(Windowed<String> windowed, Long count) {
