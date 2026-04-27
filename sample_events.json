@@ -1,0 +1,9 @@
+[
+  { "userId": "user-1", "amount": 120, "timestamp": 1710000000000 },
+  { "userId": "user-1", "amount": 85,  "timestamp": 1710000030000 },
+  { "userId": "user-1", "amount": 200, "timestamp": 1710000060000 },
+  { "userId": "user-1", "amount": 50,  "timestamp": 1710000090000 },
+  { "userId": "user-1", "amount": 300, "timestamp": 1710000120000 },
+  { "userId": "user-2", "amount": 75,  "timestamp": 1710000010000 },
+  { "userId": "user-2", "amount": 90,  "timestamp": 1710000040000 }
+]

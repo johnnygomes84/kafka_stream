@@ -1,3 +1,18 @@
 spring:
   application:
     name: stream
+  kafka:
+    bootstrap-servers: localhost:9092
+    streams:
+      application-id: fraud-detection-app
+      properties:
+        default.key.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+        default.value.serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+        commit.interval.ms: 1000
+
+app:
+  fraud:
+    input-topic: user-events
+    output-topic: alerts
+    event-threshold: 5
+    window-minutes: 5
