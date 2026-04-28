@@ -13,6 +13,7 @@ import org.apache.kafka.streams.TopologyTestDriver;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -36,8 +37,14 @@ class FraudDetectionTopologyTest {
 
     @BeforeEach
     void setUp() {
+        FraudDetectionTopology topology = new FraudDetectionTopology();
+        ReflectionTestUtils.setField(topology, "inputTopic", INPUT_TOPIC);
+        ReflectionTestUtils.setField(topology, "outputTopic", OUTPUT_TOPIC);
+        ReflectionTestUtils.setField(topology, "eventThreshold", THRESHOLD);
+        ReflectionTestUtils.setField(topology, "windowMinutes", WINDOW_MINUTES);
+
         StreamsBuilder builder = new StreamsBuilder();
-        FraudDetectionTopology.buildTopology(builder, INPUT_TOPIC, OUTPUT_TOPIC, THRESHOLD, WINDOW_MINUTES);
+        topology.build(builder);
 
         Properties props = new Properties();
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");

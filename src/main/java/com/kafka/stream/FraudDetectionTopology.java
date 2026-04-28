@@ -16,17 +16,16 @@ import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.TimeWindows;
 import org.apache.kafka.streams.kstream.Windowed;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.annotation.EnableKafkaStreams;
+import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
 
 @Slf4j
-@Configuration
-@EnableKafkaStreams
-public class FraudDetectionTopology {
+@Component
+public class FraudDetectionTopology implements KafkaTopology {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Value("${app.fraud.input-topic:user-events}")
     private String inputTopic;
@@ -40,16 +39,8 @@ public class FraudDetectionTopology {
     @Value("${app.fraud.window-minutes:5}")
     private long windowMinutes;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    @Bean
-    public KStream<String, UserEvent> fraudDetectionStream(StreamsBuilder builder) {
-        return buildTopology(builder, inputTopic, outputTopic, eventThreshold, windowMinutes);
-    }
-
-    static KStream<String, UserEvent> buildTopology(StreamsBuilder builder, String inputTopic,
-            String outputTopic, long threshold, long windowMinutes) {
-
+    @Override
+    public void build(StreamsBuilder builder) {
         Serde<UserEvent> userEventSerde = jsonSerde(UserEvent.class);
 
         KStream<String, UserEvent> userEventStream = builder
@@ -65,12 +56,10 @@ public class FraudDetectionTopology {
                 .windowedBy(window)
                 .count(Materialized.as("event-count-store"))
                 .toStream()
-                .filter((windowed, count) -> count != null && count >= threshold)
+                .filter((_, count) -> count != null && count >= eventThreshold)
                 .map((windowed, count) -> KeyValue.pair(windowed.key(), toAlertJson(windowed, count)))
-                .filter((k, v) -> v != null)
+                .filter((_, v) -> v != null)
                 .to(outputTopic, Produced.with(Serdes.String(), Serdes.String()));
-
-        return userEventStream;
     }
 
     // TODO: Spring Kafka 4.0 deprecated JsonSerde/JsonSerializer/JsonDeserializer with no built-in replacement yet.
