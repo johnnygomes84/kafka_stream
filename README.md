@@ -12,30 +12,16 @@ If a user exceeds 5 events in a window, an alert is emitted to the `alerts` topi
 
 ## How to Run Kafka (Docker)
 
+A `docker-compose.yml` is included. It runs Kafka in KRaft mode (no Zookeeper) and auto-creates topics on first use.
+
 ```bash
-docker run -d --name kafka \
-  -p 9092:9092 \
-  -e KAFKA_NODE_ID=1 \
-  -e KAFKA_PROCESS_ROLES=broker,controller \
-  -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093 \
-  -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 \
-  -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER \
-  -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT \
-  -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093 \
-  -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1 \
-  -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1 \
-  -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1 \
-  apache/kafka:3.7.0
+docker compose up -d
 ```
 
-## Create Topics
+To stop:
 
 ```bash
-docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \
-  --bootstrap-server localhost:9092 --topic user-events --partitions 1 --replication-factor 1
-
-docker exec kafka /opt/kafka/bin/kafka-topics.sh --create \
-  --bootstrap-server localhost:9092 --topic alerts --partitions 1 --replication-factor 1
+docker compose down
 ```
 
 ## How to Run the App
@@ -81,7 +67,7 @@ The app uses Jackson to deserialize events, so plain JSON from the console produ
 Prefer the REST API above for normal testing.
 
 ```bash
-docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
+docker compose exec -it kafka /opt/bitnami/kafka/bin/kafka-console-producer.sh \
   --bootstrap-server localhost:9092 --topic user-events
 
 # paste these one by one (or all at once):
@@ -96,8 +82,18 @@ docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
 
 ## Observe Results
 
+Alerts appear in two places:
+
+**1. Application logs** — `AlertConsumer` listens on the `alerts` topic and logs every alert directly in the Spring Boot console:
+
+```
+>>>>>>>>>> ALERT received on alerts topic: {"userId":"user-1",...} <<<<<<<<<<
+```
+
+**2. Kafka console consumer** — inspect the raw topic output:
+
 ```bash
-docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+docker compose exec kafka /opt/bitnami/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 --topic alerts --from-beginning
 ```
 
