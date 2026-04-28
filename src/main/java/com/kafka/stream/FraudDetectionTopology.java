@@ -55,7 +55,8 @@ public class FraudDetectionTopology {
         KStream<String, UserEvent> userEventStream = builder
                 .stream(inputTopic, Consumed.with(Serdes.String(), userEventSerde))
                 .selectKey((k, v) -> v.getUserId())
-                .filter((k, v) -> k != null);
+                .filter((k, v) -> k != null)
+                .peek((k, v) -> log.info("Stream consumed event: userId={} amount={}", k, v.getAmount()));
 
         TimeWindows window = TimeWindows.ofSizeWithNoGrace(Duration.ofMinutes(windowMinutes));
 
